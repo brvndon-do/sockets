@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
         std::cerr << std::format("listen: {}\n", std::strerror(errno));
         return EXIT_FAILURE;
     }
+    res.reset();
 
     sockaddr_storage clientAddr{};
     socklen_t clientAddrSize{sizeof(clientAddr)};
@@ -62,24 +63,10 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Client connected!\n";
 
-    // TODO: poll for incoming messages/input
-    auto receivedMessage{recvMessage(accepted)};
-    if (!receivedMessage) {
-        std::cerr << receivedMessage.error() << '\n';
+    if (const auto poll{runChat(accepted)}; !poll.has_value()) {
+        std::cerr << poll.error() << '\n';
         return EXIT_FAILURE;
     }
-
-    if (!*receivedMessage) {
-        std::cerr << "connection closed\n";
-        return 0;
-    }
-
-    // convert std::vector<byte> into std::string and display
-    const std::vector<std::byte>& payload{**receivedMessage};
-    std::string_view msg{reinterpret_cast<const char*>(payload.data()),
-                         payload.size()};
-
-    std::cout << std::format("A message from client: {}\n", msg);
 
     return 0;
 }

@@ -6,8 +6,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <expected>
 #include <format>
+#include <iostream>
+#include <iterator>
 #include <optional>
+#include <poll.h>
 #include <string>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -125,4 +129,61 @@ recvMessage(const Socket& socket) {
         return std::unexpected{"disconnected after header was sent"};
 
     return messageBuffer;
+}
+
+std::expected<void, std::string> runChat(const Socket& socket) {
+    pollfd pollfds[]{{STDIN_FILENO, POLLIN, 0}, {socket.fd(), POLLIN, 0}};
+    pollfd& stdinPfd{pollfds[0]};
+    pollfd& socketPfd{pollfds[1]};
+
+    std::cout << "Enter message: " << std::flush;
+
+    while (true) {
+        if (::poll(pollfds, std::size(pollfds), -1) == -1) {
+            if (errno == EINTR)
+                continue;
+
+            return std::unexpected{
+                std::format("error during polling: {}", std::strerror(errno))};
+        }
+
+        if (socketPfd.revents & (POLLIN | POLLHUP | POLLERR)) {
+            const auto receivedMessage{recvMessage(socket)};
+            if (!receivedMessage)
+                return std::unexpected{receivedMessage.error()};
+
+            if (!*receivedMessage) {
+                std::cout << "connection closed\n";
+                return {};
+            }
+
+            const std::vector<std::byte>& payload{**receivedMessage};
+            std::string_view msg{reinterpret_cast<const char*>(payload.data()),
+                                 payload.size()};
+
+            std::cout << std::format("Message received: {}\n", msg)
+                      << std::flush;
+        }
+
+        if (stdinPfd.revents & (POLLIN | POLLHUP)) {
+            std::string msg;
+            if (!std::getline(std::cin, msg)) {
+                if (std::cin.eof())
+                    return {};
+
+                if (std::cin.bad())
+                    return std::unexpected{"getline: unexpected error"};
+            }
+
+            if (const auto sent{
+                    sendMessage(socket, std::as_bytes(std::span(msg)))};
+                !sent.has_value()) {
+                return std::unexpected{sent.error()};
+            }
+        }
+
+        std::cout << "Enter message: " << std::flush;
+    }
+
+    return {};
 }

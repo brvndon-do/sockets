@@ -4,8 +4,6 @@
 #include <cstring>
 #include <format>
 #include <iostream>
-#include <span>
-#include <string>
 #include <sys/socket.h>
 
 int main(int argc, char* argv[]) {
@@ -53,11 +51,10 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    // send down here
-    std::string msg{"Hello, from client!"};
-    if (const auto sent{sendMessage(conn, std::as_bytes(std::span(msg)))};
-        !sent.has_value()) {
-        std::cerr << sent.error() << '\n';
+    std::cout << "Connected to server!\n";
+
+    if (const auto poll{runChat(conn)}; !poll.has_value()) {
+        std::cerr << poll.error() << '\n';
         return EXIT_FAILURE;
     }
 

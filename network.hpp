@@ -43,3 +43,6 @@ sendMessage(const Socket& socket, std::span<const std::byte> payload);
 
 [[nodiscard]] std::expected<std::optional<std::vector<std::byte>>, std::string>
 recvMessage(const Socket& socket);
+
+// NOTE: not really network-related, but network.hpp is shared so whatever.
+[[nodiscard]] std::expected<void, std::string> runChat(const Socket& socket);
