@@ -6,8 +6,6 @@
 #include <iostream>
 #include <sys/socket.h>
 
-// TODO: add error checks for each syscall; intentionally left out at first.
-
 int main(int argc, char* argv[]) {
     constexpr int n_backlog{1};
 
@@ -33,7 +31,12 @@ int main(int argc, char* argv[]) {
     const Socket listener{
         ::socket(res->ai_family, res->ai_socktype, res->ai_protocol)};
 
-    ::setsockopt(listener.fd(), SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    if (const int status{::setsockopt(listener.fd(), SOL_SOCKET, SO_REUSEADDR,
+                                      &yes, sizeof(yes))};
+        status != 0) {
+        std::cerr << std::format("setsockopt: {}\n", std::strerror(errno));
+        return EXIT_FAILURE;
+    }
 
     if (const int status{::bind(listener.fd(), res->ai_addr, res->ai_addrlen)};
         status != 0) {
@@ -51,6 +54,11 @@ int main(int argc, char* argv[]) {
     const Socket accepted{::accept(listener.fd(),
                                    reinterpret_cast<sockaddr*>(&clientAddr),
                                    &clientAddrSize)};
+
+    if (!accepted.isValid()) {
+        std::cerr << "failed to accept socket\n";
+        return EXIT_FAILURE;
+    }
 
     std::cout << "Client connected!\n";
 
